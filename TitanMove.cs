@@ -11,7 +11,6 @@ public class TitanMove : MonoBehaviour
     public bool InShootingRange = false;
     int Destination;
     string point = "WayPoint";
-    string ShootingCollider = "SphereCollider";
     NavMeshAgent agent;
     Animator anime;
     GameObject[] WayPoints = new GameObject[11];
@@ -19,7 +18,8 @@ public class TitanMove : MonoBehaviour
     bool IsRight;
     bool IsHit=false;
     GameController game;
-    int destMax;
+    int destMax,destDanger,titanIndex;
+    
     void Start()
     {
         game = GameObject.Find("Base").GetComponent<GameController>();
@@ -47,10 +47,12 @@ public class TitanMove : MonoBehaviour
         if (game.Level == 1)
         {
             destMax = 10;
+            destDanger = 8;
         }
         else if (game.Level == 2)
         {
             destMax = 9;
+            destDanger = destMax - 1;
         }
         else
         {
@@ -58,7 +60,17 @@ public class TitanMove : MonoBehaviour
                 destMax = 8;
             else
                 destMax = 7;
+            destDanger = destMax - 1;
         }
+        for (int i = destMax; i < WayPoints.Length; i++)
+        {
+            Destroy(WayPoints[i].GetComponent<MeshRenderer>());
+            Destroy(WayPoints[i].GetComponent<MeshFilter>());
+        }
+        int dangerRange = destMax - destDanger;
+        for (int i = 1; i < dangerRange+1; i++)
+            WayPoints[destMax - i].GetComponent<MeshRenderer>().material = game.plasmaGroundMat;
+        titanIndex = transform.GetSiblingIndex();
     }
     private void OnTriggerEnter(Collider other)
     {
@@ -66,51 +78,65 @@ public class TitanMove : MonoBehaviour
         {
             if (other.CompareTag(point))
             {
+                if (other.transform.GetSiblingIndex() >= destDanger && !InShootingRange)
+                {
+                    InShootingRange = true;
+                    game.BarFill.fillAmount += 0.125f;
+                    GameController.TitansInRange++;
+                    if (GameController.TitansInRange == 8)
+                    {
+                        game.PressSpace.SetActive(true);
+                        game.Fire.Post(game.gameObject);
+                    }
+                    RedSkin.SetActive(true);
+                    mainSkin.SetActive(false);
+                }
                 if (other.gameObject == WayPoints[Destination])
                 {
-                    game.Tauntings[game.tauntingDire].SetActive(false);
+                    if (titanIndex>0)
+                    {
+                        game.Tauntings[game.tauntingDire].SetActive(false);
+                    }
+                    
                     stepIndex = Destination;
                     agent.isStopped = true;
                     anime.SetTrigger("idle");
-                    GameController.MoveLock = false;
                     if (stepIndex == destMax)
                     {
                         attack();
                         if (GameController.TitansInRange < 8)
-                        {
                             game.ActionUnlock();
-                            return;
-                        }
                     }
-                    game.NextTurn();
-                }
-                
+                    else
+                        if (titanIndex>0)
+                        game.NextTurn();
 
-            }
-            if (other.CompareTag(ShootingCollider))
-            {
-                game.BarFill.fillAmount +=0.125f;
-                GameController.TitansInRange++;
-                if (GameController.TitansInRange==8)
-                {
-                    game.PressSpace.SetActive(true);
-                    game.Fire.Post(game.gameObject);
                 }
-                RedSkin.SetActive(true);
-                mainSkin.SetActive(false);
             }
+            
         }
         
     }
     public void MoveTitanTurn(int stepsNumber)
     {
-        GameController.MoveLock = true;
+        if (titanIndex==0)
+            StartCoroutine(diffrentMove(stepsNumber));
+        else
+        Move(stepsNumber);
+    }
+    IEnumerator diffrentMove(int move)
+    {
+        yield return new WaitForSeconds(Random.Range(0.2f, 0.5f));
+        Move(move);
+    }
+    void Move(int move)
+    {
         agent.isStopped = false;
         anime.SetTrigger("run");
-        Destination = stepIndex + stepsNumber;
-        if (Destination>destMax)
+        Destination = stepIndex + move;
+        if (Destination > destMax)
             Destination = destMax;
-        agent.SetDestination(WayPoints[Destination].transform.position);   
+        agent.SetDestination(WayPoints[Destination].transform.position);
     }
     public void Shoot()
     {
@@ -124,6 +150,7 @@ public class TitanMove : MonoBehaviour
     }
     public void attack()
     {
+        IsHit = false;
         if (stepIndex==destMax)
         {
             if (Random.Range(0, 2) == 1)
@@ -133,9 +160,9 @@ public class TitanMove : MonoBehaviour
         }
         else
         {
-            anime.SetTrigger("Run");
+            anime.SetTrigger("run");
             agent.isStopped = false;
-            agent.SetDestination(WayPoints[destMax].transform.position);
+            MoveTitanTurn(10);
             StartCoroutine(secondAttack());
         }    
         
@@ -154,6 +181,7 @@ public class TitanMove : MonoBehaviour
     }
     public void GiantAttack()
     {
+        if (!IsHit)
         game.GiantAttack.Post(game.gameObject);
     }
     public void GiantStep()

@@ -7,7 +7,6 @@ public class GameController : MonoBehaviour
     bool loseLock;
     public GameObject StepBG;
     public int Level;
-    int LevelMax;
     GameObject[] Numbers=new GameObject[6];
     Transform titanFathers;
     GameObject[] NorthTitans = new GameObject[2];
@@ -15,9 +14,8 @@ public class GameController : MonoBehaviour
     GameObject[] EastTitans = new GameObject[2];
     GameObject[] WestTitans = new GameObject[2];
     public static int TitansInRange;
-    int random;
+    int random=-1;
     bool ActionLock, QuickLock, endStart = false;
-    public static bool MoveLock = false;
     WaitForSeconds waitMove, waitQuick;
     WaitForSeconds wait1 = new WaitForSeconds(1);
     GameObject[] tempTitans;
@@ -25,6 +23,7 @@ public class GameController : MonoBehaviour
     public GameObject[] soldiers;
     int Univiersalcounter = 0;
     public string[] Keys;
+    public int[] numbers;
     public Sprite[] sprites;
     public GameObject[] quicksUI;
     public GameObject[] Tauntings;
@@ -33,10 +32,10 @@ public class GameController : MonoBehaviour
     public Image BarFill;
     public GameObject PressSpace;
     public ParticleSystem smoke;
-
     public GameObject gameOver;
     public GameObject winScreen;
     public GameObject DarkBack;
+    public Material plasmaGroundMat;
     public AK.Wwise.Event Music,Fire,click,lose,Miss,QuickSound,randomSound,shoot,smokeLaunch,Taunt,WinSound,GiantAttack,GiantStep,stopAll;
     private void Awake()
     {
@@ -47,7 +46,6 @@ public class GameController : MonoBehaviour
             Numbers[i].SetActive(false);
         }
         StepBG.SetActive(false);
-        LevelMax = 3 + Level;
     }
     // Start is called before the first frame update
     void Start()
@@ -64,15 +62,16 @@ public class GameController : MonoBehaviour
         }
         else if (Level == 2)
         {
-            waitMove = new WaitForSeconds(2);
-            waitQuick = new WaitForSeconds(2);
+            waitMove = new WaitForSeconds(1.5f);
+            waitQuick = new WaitForSeconds(1);
         }
         else
         {
-            waitMove = new WaitForSeconds(1.5f);
-            waitQuick = new WaitForSeconds(1.5f);
+            waitMove = new WaitForSeconds(1);
+            waitQuick = new WaitForSeconds(1);
         }
         keysRandomizer(Keys,sprites);
+        keysRandomizer(numbers);
         Music.Post(gameObject);
         loseLock = false;
     }
@@ -81,68 +80,32 @@ public class GameController : MonoBehaviour
         if (ActionLock)
         {
             if (Input.GetKeyDown(KeyCode.UpArrow))
-            {
-                ActionLock = false;
-                Numbers[random].SetActive(false);
-                Taunting(0);
-                StepBG.SetActive(false);
-                for (int i = 0; i < 2; i++)
-                {
-                    NorthTitans[i].GetComponent<TitanMove>().MoveTitanTurn(random);
-                }
-            }
+                TitanRegularMove(0, NorthTitans);
             if (Input.GetKeyDown(KeyCode.DownArrow))
-            {
-                ActionLock = false;
-                Numbers[random].SetActive(false);
-                Taunting(2);
-                StepBG.SetActive(false);
-                for (int i = 0; i < 2; i++)
-                {
-                    SouthTitans[i].GetComponent<TitanMove>().MoveTitanTurn(random);
-                }
-            }
+                TitanRegularMove(2, SouthTitans);
             if (Input.GetKeyDown(KeyCode.RightArrow))
-            {
-                ActionLock = false;
-                Numbers[random].SetActive(false);
-                Taunting(1);
-                StepBG.SetActive(false);
-                for (int i = 0; i < 2; i++)
-                {
-                    EastTitans[i].GetComponent<TitanMove>().MoveTitanTurn(random);
-                }
-            }
+                TitanRegularMove(1, EastTitans);
             if (Input.GetKeyDown(KeyCode.LeftArrow))
-            {
-                ActionLock = false;
-                Numbers[random].SetActive(false);
-                Taunting(3);
-                StepBG.SetActive(false);
-                for (int i = 0; i < 2; i++)
-                {
-                    WestTitans[i].GetComponent<TitanMove>().MoveTitanTurn(random);
-                }
-            }
+                TitanRegularMove(3, WestTitans);
         }
         if (Input.GetKeyDown(KeyCode.Space) && !endStart)
         {
             
             if (TitansInRange == 8)
             {
+                Tauntings[0].transform.parent.gameObject.SetActive(false);
                 smoke.Play();
                 smokeLaunch.Post(gameObject);
                 DarkBack.SetActive(false);
                 PressSpace.SetActive(false);
                 StopAllCoroutines();
-                MoveLock = true;
                 ActionLock = false;
-                Numbers[random].SetActive(false);
+                Numbers[numbers[random]-1].SetActive(false);
                 StepBG.SetActive(false);
                 foreach (GameObject titan in titans)
-                {
                     titan.GetComponent<TitanMove>().Shoot();
-                }
+                foreach (GameObject sold in soldiers)
+                    sold.GetComponent<Actions>().Aiming();
                 endStart = true;
                 random = 0;
                 StartCoroutine(FirstQuick());
@@ -157,7 +120,7 @@ public class GameController : MonoBehaviour
                 soldiers[random].GetComponent<Actions>().Attack();
                 titans[random].GetComponent<TitanMove>().Die();
                 random++;
-                if (random==8)
+                if (random == 8)
                 {
                     QuickLock = false;
                     StartCoroutine(Win());
@@ -167,8 +130,10 @@ public class GameController : MonoBehaviour
                     StopAllCoroutines();
                     StartCoroutine(QuickTimeEvent());
                 }
-                
+
             }
+            else if (Input.anyKeyDown&&!Input.GetKeyDown(Keys[random]))
+                    quickFail();
         }
     }
     void TitansFill(GameObject[] Titans, int Direction)
@@ -190,7 +155,7 @@ public class GameController : MonoBehaviour
         else
             tempTitans = WestTitans;
         for (int i = 0; i < 2; i++)
-            tempTitans[i].GetComponent<TitanMove>().MoveTitanTurn(random);
+            tempTitans[i].GetComponent<TitanMove>().MoveTitanTurn(numbers[random]);
     }
     public void NextTurn()
     {
@@ -201,15 +166,16 @@ public class GameController : MonoBehaviour
     {
         yield return wait1;
         randomSound.Post(gameObject);
-        random = UnityEngine.Random.Range(1, LevelMax);
-        Numbers[random].SetActive(true);
+        random++;
+        Numbers[numbers[random]-1].SetActive(true);
         StepBG.SetActive(true);
         ActionLock = true;
         yield return waitMove;
         if (ActionLock)
         {
+            ActionLock = false;
             Miss.Post(gameObject);
-            Numbers[random].SetActive(false);
+            Numbers[numbers[random] - 1].SetActive(false);
             StepBG.SetActive(false);
             TitanMove();
         }
@@ -228,13 +194,15 @@ public class GameController : MonoBehaviour
         QuickLock = true;
         yield return waitQuick;
         if (QuickLock)
-        {
-            smoke.Stop(gameObject);
-            QuickLock = false;
-            quicksUI[random].SetActive(false);
-            for (int i = random; i < 8; i++)
+            quickFail();
+    }
+    void quickFail()
+    {
+        smoke.Stop(gameObject);
+        QuickLock = false;
+        quicksUI[random].SetActive(false);
+        for (int i = random; i < 8; i++)
             titans[i].GetComponent<TitanMove>().attack();
-        }
     }
     void keysRandomizer(string[] Array,Sprite[] Arr2)
     {
@@ -248,9 +216,24 @@ public class GameController : MonoBehaviour
             swap(Arr2, i, tempRand);
         }
     }
+    void keysRandomizer(int[] Array)
+    {
+        int n = Array.Length;
+        System.Random rand = new System.Random();
+        for (int i = 0; i < n; i++)
+        {
+            swap(Array, i, i + rand.Next(n - i));
+        }
+    }
     void swap(string[] array, int a, int b)
     {
         string temp = array[a];
+        array[a] = array[b];
+        array[b] = temp;
+    }
+    void swap(int[] array, int a, int b)
+    {
+        int temp = array[a];
         array[a] = array[b];
         array[b] = temp;
     }
@@ -274,7 +257,9 @@ public class GameController : MonoBehaviour
     {
         yield return waitMove;
         winScreen.SetActive(true);
+        stopAll.Post(gameObject);
         WinSound.Post(gameObject);
+        Time.timeScale = 0;
     }
     public void Lost()
     {
@@ -282,7 +267,22 @@ public class GameController : MonoBehaviour
         {
             loseLock = true;
             gameOver.SetActive(true);
+            stopAll.Post(gameObject);
             lose.Post(gameObject);
+            Time.timeScale = 0;
         }
+    }
+    void TitanRegularMove(int dire,GameObject[]Titans)
+    {
+        ActionLock = false;
+        Numbers[numbers[random]-1].SetActive(false);
+        Taunting(dire);
+        StepBG.SetActive(false);
+        for (int i = 0; i < 2; i++)
+        {
+            Titans[i].GetComponent<TitanMove>().MoveTitanTurn(numbers[random]);
+        }
+        soldiers[dire*2].GetComponent<Actions>().Jump();
+        soldiers[(dire*2)+1].GetComponent<Actions>().Jump();
     }
 }

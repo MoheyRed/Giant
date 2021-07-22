@@ -10,12 +10,14 @@ public class RegularCanvas : MonoBehaviour
     {
         game.click.Post(gameObject.gameObject);
         game.stopAll.Post(game.gameObject);
+        Time.timeScale = 1;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex+1);
     }
     public void Replay()
     {
         game.click.Post(gameObject.gameObject);
         game.stopAll.Post(game.gameObject);
+        Time.timeScale = 1;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
     public void Exit()
